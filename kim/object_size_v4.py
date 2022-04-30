@@ -1,4 +1,5 @@
 #이 코드는 https://github.com/Practical-CV/Measuring-Size-of-Objects-with-OpenCV 를 기반으로 만들어졌음
+#TODO: 이 코드는 밑면 ellipse를 구현하기 위한코드이고 사용 보류중임
 
 # import the necessary packages
 from scipy.spatial import distance as dist
@@ -28,7 +29,7 @@ def object_size(img_path, ref_width):
 
 	# find contours in the edge map
 	cnts = cv2.findContours(edged.copy(), cv2.RETR_EXTERNAL,
-		cv2.CHAIN_APPROX_NONE)
+		cv2.CHAIN_APPROX_SIMPLE)
 	cnts = imutils.grab_contours(cnts)
 
 	# sort the contours from left-to-right and initialize the
@@ -41,9 +42,11 @@ def object_size(img_path, ref_width):
 		# if the contour is not sufficiently large, ignore it
 		if cv2.contourArea(c) < 100:
 			continue
-		else:
-			cArea = cv2.contourArea(c)
-			cv2.drawContours(image, c, -1, (255,0,0), 3)
+		# else:
+		# 	cArea = cv2.contourArea(c)
+		# 	cv2.drawContours(image, c, -1, (255,0,0), 3)
+		ellipse = cv2.fitEllipse(c)
+		cv2.ellipse(image, ellipse, (255,0,0), 2)
 
 		# compute the rotated bounding box of the contour
 		orig = image.copy()
@@ -99,7 +102,6 @@ def object_size(img_path, ref_width):
 		# compute the size of the object
 		dimA = dA / pixelsPerMetric
 		dimB = dB / pixelsPerMetric
-		cArea = cArea / (pixelsPerMetric**2)
 
 		# draw the object sizes on the image
 		cv2.putText(orig, "{:.1f}mm".format(dimA),
@@ -113,9 +115,9 @@ def object_size(img_path, ref_width):
 		cv2.imshow("Image", orig)
 		cv2.waitKey(0)
 
-		listABs.append((dimA, dimB, cArea))
+		listABs.append((dimA, dimB))
 		
-	# print(listABs, listABs[0][0]*listABs[0][1], listABs[1][0]*listABs[1][1]) #testcode
+	print(listABs, listABs[0][0]*listABs[0][1], listABs[1][0]*listABs[1][1]) #testcode
 	return listABs
 
 # % python .\object_size_v.py -i1 .\images\top.png -i2 .\images\side.png -w 24
@@ -139,11 +141,9 @@ if __name__ == "__main__":
 	y = dims1[1][0]
 	z = dims2[1][1] * sideCam_degree_cos
 
-	top_proportion = dims1[1][2]/(dims1[1][0]*dims1[1][1])
-	side_proportion = dims2[1][2]/(dims2[1][0]*dims2[1][1])
+	# top_proportion = dims1[1][2]/(dims1[1][0]*dims1[1][1])
+	# side_proportion = dims2[1][2]/(dims2[1][0]*dims2[1][1])
 
-	print("box x, y, z: ({}, {}, {})".format(x, y, z))
-	print("box volume:", x*y*z, "mm^3")
-	print("topP: {}, vol_estm: {}mm^3".format(top_proportion, x*y*z*top_proportion))
-	print("sideP: {}, vol_estm: {}mm^3".format(side_proportion, x*y*z*side_proportion))
-	print("average: {}mm^3".format((x*y*z*top_proportion + x*y*z*side_proportion)/2))
+	print(x, y, z, "box volume:", x*y*z, "mm^3")
+	# print("topP: {}, vol_estm: {}mm^3".format(top_proportion, x*y*z*top_proportion))
+	# print("sideP: {}, vol_estm: {}mm^3".format(side_proportion, x*y*z*side_proportion))
