@@ -41,6 +41,9 @@ def object_size(img_path, ref_width):
 		# if the contour is not sufficiently large, ignore it
 		if cv2.contourArea(c) < 100:
 			continue
+		else:
+			cArea = cv2.contourArea(c)
+			cv2.drawContours(image, c, -1, (255,0,0), 3)
 
 		# compute the rotated bounding box of the contour
 		orig = image.copy()
@@ -109,8 +112,9 @@ def object_size(img_path, ref_width):
 		cv2.imshow("Image", orig)
 		cv2.waitKey(0)
 
-		listABs.append((dimA, dimB))
-	
+		listABs.append((dimA, dimB, cArea))
+		
+	print(listABs, listABs[0][0]*listABs[0][1], listABs[1][0]*listABs[1][1]) #testcode
 	return listABs
 
 # % python .\object_size_v2.py -i1 .\images\top.png -i2 .\images\side.png -w 24
@@ -129,9 +133,14 @@ if __name__ == "__main__":
 	dims1 = object_size(args["image1"], args["width"])
 	dims2 = object_size(args["image2"], args["width"])
 
-	sideCam_degree = dims2[0][0]/dims1[0][0]
+	sideCam_degree_cos = dims2[0][0]/dims1[0][0]
 	x = dims1[1][1]
 	y = dims1[1][0]
-	z = dims2[1][1] * sideCam_degree
+	z = dims2[1][1] * sideCam_degree_cos
 
-	print(x, y, z, "volume:", x*y*z, "mm^3")
+	top_proportion = dims1[1][2]/(dims1[1][0]*dims1[1][1])
+	side_proportion = dims2[1][2]/(dims2[1][0]*dims2[1][1])
+
+	print(x, y, z, "box volume:", x*y*z, "mm^3")
+	print("topP: {}, vol_estm: {}mm^3".format(top_proportion, x*y*z*top_proportion))
+	print("sideP: {}, vol_estm: {}mm^3".format(side_proportion, x*y*z*side_proportion))
