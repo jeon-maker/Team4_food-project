@@ -1,4 +1,5 @@
 #참고자료: https://github.com/Practical-CV/Measuring-Size-of-Objects-with-OpenCV
+from cv2 import MARKER_DIAMOND
 from scipy.spatial import distance
 from imutils import perspective
 from imutils import contours
@@ -22,10 +23,60 @@ class RefObject(Object):
         self.width = refObj_width
     
 class Image:
+    """카메라로 찍은 사진(음식, ref물체 포함)"""
     def __init__(self, img_path):
         self.img_path = img_path
-        self.original_img #아무작업 안 한 오리지널 사진
-        self.marked_img #여러가지 표시가 되어있는 사진
+        self.original_img = self.getImage() #아무작업 안 한 오리지널 사진
+        self.contours = self.getValidContours() #
+        self.marked_img = self.getMarkedImage() #여러가지 표시가 되어있는 사진
+        
+    def getImage(self, path=None):
+        """path에서 이미지 파일 리턴"""
+        if path is None:
+            path = self.img_path
+
+        image = cv2.imread(path)
+        return image
+
+    def getValidContours(self, image=None, ignoreLessThan_px=100):
+        """
+        image에서 윤곽선 따서 쓸만한 윤곽선들만 리턴
+        ignoreLessThan_px 보다 적은 영역으로 된 윤곽은 버림
+        """
+        if image is None:
+            image = self.original_img
+
+        # 이미지 grayscale로 변경. 조금 blur시키기.
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        gray = cv2.GaussianBlur(gray, (7, 7), 0)
+
+        # 이미지 엣지 따고, 확장 수축을 통해 자잘한 경계선들을 제거
+        edged = cv2.Canny(gray, 50, 100)
+        edged = cv2.dilate(edged, None, iterations=1)
+        edged = cv2.erode(edged, None, iterations=1)
+        cv2.imshow("test", rescaleFrame(edged, 0.5));cv2.waitKey(0)#testcode
+
+        # edged 이미지에서 윤곽선따기, cnts 좌->우로 정렬
+        cnts = cv2.findContours(edged.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        cnts = imutils.grab_contours(cnts)
+        (cnts, _) = contours.sort_contours(cnts)
+
+        # 필요한 contours만 분류해서 valid_cnts에 저장(면적이 ignoreLessThan_px보다 작은 것 무시)
+        valid_cnts = list()
+        for cnt in cnts:
+            if cv2.contourArea(cnt) < ignoreLessThan_px: continue
+            else: valid_cnts.append(cnt)
+
+        return valid_cnts
+    
+    def getMarkedImage(self, image=None):
+        """"""
+        marked_img = self.original_img.copy()#testcode
+        cv2.drawContours(marked_img, self.contours, -1, (255,0,0), 3)#testcode
+
+        return marked_img
+        
+        
 
 
 def getTargetVolume(imgPath_topview, imgPath_sideview, refObject_width=WIDTH_REF_OBJECT):
@@ -60,4 +111,8 @@ def rescaleFrame(frame, scale=0.75):
     return cv2.resize(frame, dimensions, interpolation=cv2.INTER_AREA)
 
 if __name__ == "__main__":
-    print("hello")
+    #test
+    testimg = Image("images/top3.png")
+    resized_testimg = rescaleFrame(testimg.marked_img, 0.5)
+    cv2.imshow("test", resized_testimg);cv2.waitKey(0)#testcode
+    #tset
