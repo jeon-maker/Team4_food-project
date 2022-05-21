@@ -23,11 +23,11 @@ WIDTH_REF_OBJECT = 24 #100원 동전의 지름(mm)
 
 class Object:
     """사진에 찍혀있는 실제물체 하나"""
-    def __init__(self, topImg=None, sideImg=None, topContourIndex=None, sideContourIndex=None):
+    def __init__(self, topImg=None, sideImg=None):
         self.topImg = topImg
         self.sideImg = sideImg
-        self.top_cntIndex = topContourIndex
-        self.side_cntIndex = sideContourIndex 
+        self.top_cntIndex = None
+        self.side_cntIndex = None
     
     def setContourIndex(self, top_idx, side_idx):
         self.top_cntIndex = top_idx
@@ -36,16 +36,17 @@ class Object:
 
 class RefObject(Object):
     """물체 중 길이를 가늠하기 위한 reference Object(ex> 100원 동전)"""
-    def __init__(self, topImg=None, sideImg=None, topContourIndex=None, sideContourIndex=None, refObj_width=WIDTH_REF_OBJECT):
-        super().__init__(topImg, sideImg, topContourIndex, sideContourIndex)
+    def __init__(self, topImg=None, sideImg=None, refObj_width=WIDTH_REF_OBJECT):
+        super().__init__(topImg, sideImg)
         self.width = refObj_width
 
 class Object3D(Object):
     """높이가 있는 3D 물체"""
-    def __init__(self, topImg=None, sideImg=None, topContourIndex=None, sideContourIndex=None):
-        super().__init__(topImg, sideImg, topContourIndex, sideContourIndex)
+    def __init__(self, topImg=None, sideImg=None):
+        super().__init__(topImg, sideImg)
         self.top_dimensions = None # 형식 (width, height, area)
         self.side_dimensions = None # 형식 (width, height, area)
+        self.SINE_CAM_ANGLE = None
         self.volume = None
 
     def calc2dDimensions(self, image, contour):
@@ -74,7 +75,7 @@ class Image:
         self.original_img = self.getImage() #아무작업 안 한 오리지널 사진
         self.contours = self.getValidContours() #물체로 인식된 윤곽선들 모음
         self.marked_img = self.getMarkedImage() #여러가지 표시가 되어있는 사진
-        self.refObj = None # reference object - RefObject()
+        self.refObj = None # reference object - RefObject() TODO: 이것을 그냥 Image 클래스에 종속시키는 방향 고려
         self.tarObj = None # target object - Object3D()
         self.PX_PER_MM = None # 1픽셀 당 mm(길이)
         
@@ -228,10 +229,10 @@ if __name__ == "__main__":
     #test
     idx = 3
     if idx == 1: idx = ''
-    refObj = RefObject()
-    foodObj = Object3D()
     topImage = Image("images/top{}.png".format(idx))
     sideImage = Image("images/side{}.png".format(idx))
+    refObj = RefObject(topImage, sideImage)
+    foodObj = Object3D(topImage, sideImage)
     cv2.imshow('top', rescaleFrame(topImage.marked_img, 0.5))
     cv2.imshow('side', rescaleFrame(sideImage.marked_img, 0.5))
     cv2.waitKey(1)
