@@ -39,6 +39,7 @@ def object_size(img_path, ref_width):
 	# print(type(cnts))#testcode
 	# print(len(cnts))#testcode
 
+	orig = image.copy()
 	# loop over the contours individually
 	for c in cnts:
 		# print(type(c))#testcode
@@ -56,10 +57,10 @@ def object_size(img_path, ref_width):
 
 		# compute the rotated bounding box of the contour
 		# TODO: cv2.boundingRect(contour)로 바꿔서 계산
-		orig = image.copy()
 		box = cv2.minAreaRect(c)
 		box = cv2.cv.BoxPoints(box) if imutils.is_cv2() else cv2.boxPoints(box)
 		box = np.array(box, dtype="int")
+#--------------------------------------여기까지 함--------------------------------------#
 
 		# order the points in the contour such that they appear
 		# in top-left, top-right, bottom-right, and bottom-left
@@ -119,11 +120,11 @@ def object_size(img_path, ref_width):
 			(int(trbrX + 10), int(trbrY)), cv2.FONT_HERSHEY_SIMPLEX,
 			0.65, (255, 255, 255), 2)
 
-		# show the output image
-		cv2.imshow("Image", orig)
-		cv2.waitKey(0)
-
 		listABs.append((dimA, dimB, cArea))
+
+	# show the output image
+	cv2.imshow("Image", orig)
+	cv2.waitKey(0)
 		
 	# print(listABs, listABs[0][0]*listABs[0][1], listABs[1][0]*listABs[1][1]) #testcode
 	return listABs
@@ -143,11 +144,6 @@ if __name__ == "__main__":
 	# 두 이미지에 대해 dimensions를 받기
 	dims1 = object_size(args["image1"], args["width"])
 	dims2 = object_size(args["image2"], args["width"])
-
-	# sideCam_degree_cos = dims2[0][0]/dims1[0][0] 
-	# x = dims1[1][1]
-	# y = dims1[1][0]
-	# z = dims2[1][1] * sideCam_degree_cos # FIXME: 잘못된 계산법!! 고치기
 
 	camAngle_sin = dims2[0][0]/dims1[0][0]
 	x = dims1[1][1]
