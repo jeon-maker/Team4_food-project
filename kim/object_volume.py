@@ -7,6 +7,18 @@ import argparse
 import imutils
 import cv2
 
+# TODO: 코드 서순
+    # 1. 탑뷰 이미지에서 발견한 물체들 나열
+    # 2. 사이드뷰 이미지에서 발견한 물체들 나열
+    # 3. 1,2 에서 발견한 물체들 중 각각 referance object(refO)과 target object(tarO) 하나씩 선택
+    # 4. refO과 tarO의 top, side에서의 width, height 리스트에 저장
+    # 5. tarO의 top, side에서의 contour area(cArea)를 리스트에 저장
+    # 6. 4에서 구한 refO의 width들로 각도(camAngle_sin)를 계산
+    # 7. tarO_top의 height와 camAngle_sin으로 3차원 높이(3dHeight) 계산
+    # 8. 물체를 둘러싸는 큐브 부피 구하기
+    # 9. cArea를 이용해서 top_proportion과 side_proportion구한 뒤 prism부피 계산
+    # 10. 두개의 prism부피 평균값 구한 뒤 리턴
+
 WIDTH_REF_OBJECT = 24 #100원 동전의 지름(mm)
 
 class Object:
@@ -16,6 +28,11 @@ class Object:
         self.sideImg = sideImg
         self.top_cntIndex = topContourIndex
         self.side_cntIndex = sideContourIndex 
+    
+    def setContourIndex(self, top_idx, side_idx):
+        self.top_cntIndex = top_idx
+        self.side_cntIndex = side_idx
+
 
 class RefObject(Object):
     """물체 중 길이를 가늠하기 위한 reference Object(ex> 100원 동전)"""
@@ -27,9 +44,8 @@ class Object3D(Object):
     """높이가 있는 3D 물체"""
     def __init__(self, topImg=None, sideImg=None, topContourIndex=None, sideContourIndex=None):
         super().__init__(topImg, sideImg, topContourIndex, sideContourIndex)
-        # 형식 (width, height, area)
-        self.top_dimensions = None
-        self.side_dimensions = None
+        self.top_dimensions = None # 형식 (width, height, area)
+        self.side_dimensions = None # 형식 (width, height, area)
         self.volume = None
 
     def calc2dDimensions(self, image, contour):
@@ -58,8 +74,8 @@ class Image:
         self.original_img = self.getImage() #아무작업 안 한 오리지널 사진
         self.contours = self.getValidContours() #물체로 인식된 윤곽선들 모음
         self.marked_img = self.getMarkedImage() #여러가지 표시가 되어있는 사진
-        self.refObj = None # RefObject
-        self.foodObj = None # Object3D
+        self.refObj = None # reference object - RefObject()
+        self.tarObj = None # target object - Object3D()
         self.PX_PER_MM = None # 1픽셀 당 mm(길이)
         
     def getImage(self, path=None):
@@ -181,29 +197,17 @@ class Image:
         """전달받은 contour의 내부 면적 리턴"""
         return cv2.contourArea(contour)
         
+    def setObjects(self, refObj: RefObject, tarObj: Object3D):
+        self.refObj = refObj
+        self.tarObj = tarObj
+
+
     def setPixelsPerMetric(self):
         pass
 
     def px2mm(self):pass
     def px2sqmm(self):pass
-        
-
-
-def getTargetVolume(imgPath_topview, imgPath_sideview, refObject_width=WIDTH_REF_OBJECT):
-    # TODO: 코드 서순
-    # 1. 탑뷰 이미지에서 발견한 물체들 나열
-    # 2. 사이드뷰 이미지에서 발견한 물체들 나열
-    # 3. 1,2 에서 발견한 물체들 중 각각 referance object(refO)과 target object(tarO) 하나씩 선택
-    # 4. refO과 tarO의 top, side에서의 width, height 리스트에 저장
-    # 5. tarO의 top, side에서의 contour area(cArea)를 리스트에 저장
-    # 6. 4에서 구한 refO의 width들로 각도(camAngle_sin)를 계산
-    # 7. tarO_top의 height와 camAngle_sin으로 3차원 높이(3dHeight) 계산
-    # 8. 물체를 둘러싸는 큐브 부피 구하기
-    # 9. cArea를 이용해서 top_proportion과 side_proportion구한 뒤 prism부피 계산
-    # 10. 두개의 prism부피 평균값 구한 뒤 리턴
-    return
-    
-
+          
 def midpoint(point1, point2):
     return ((point1[0] + point2[0])/2, (point1[1] + point2[1])/2)
 
@@ -230,6 +234,24 @@ if __name__ == "__main__":
     sideImage = Image("images/side{}.png".format(idx))
     cv2.imshow('top', rescaleFrame(topImage.marked_img, 0.5))
     cv2.imshow('side', rescaleFrame(sideImage.marked_img, 0.5))
-    cv2.waitKey(0)
+    cv2.waitKey(1)
+    
+    # 사용자가 refObject와 foodObject를 번호로 지정
+    print("<Top Image>")
+    top_ref_index = input("Reference 물체의 번호:")
+    top_tar_index = input("부피 측정을 원하는 음식의 번호:")
+    print("<Side Image>")
+    side_ref_index = input("Reference 물체의 번호:")
+    side_tar_index = input("부피 측정을 원하는 음식의 번호:")
+
+    # Object들에 index 설정
+    refObj.setContourIndex(top_ref_index, side_ref_index)
+    foodObj.setContourIndex(top_tar_index, side_tar_index)
+
+    # Image들에 Object 설정
+    topImage.setObjects(refObj, foodObj)
+    sideImage.setObjects(refObj, foodObj)
+
+    
     #tset
     
