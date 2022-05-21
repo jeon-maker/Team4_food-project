@@ -15,28 +15,42 @@ class Object:
         self.topImg = topImg
         self.sideImg = sideImg
         self.top_cntIndex = topContourIndex
-        self.side_cntIndex = sideContourIndex
-        # FIXME: 밑의 세가지는 Object가 아닌 한 사진에서의 물체의 property임
-        # self.cntArea = None #물체의 윤곽선 내부 면적
-        # self.bbox_width = -1 #물체를 감싸는 상자(Bounding Box)의 가로길이 (단위:mm)
-        # self.bbox_height = -1 #물체를 감싸는 상자(Bounding Box)의 세로길이 (단위:mm)
+        self.side_cntIndex = sideContourIndex 
 
-class Object2D(Object):
-    """높이가 없는 2D 물체"""
-    def __init__(self, topImg=None, sideImg=None, topContourIndex=None, sideContourIndex=None):
+class RefObject(Object):
+    """물체 중 길이를 가늠하기 위한 reference Object(ex> 100원 동전)"""
+    def __init__(self, topImg=None, sideImg=None, topContourIndex=None, sideContourIndex=None, refObj_width=WIDTH_REF_OBJECT):
         super().__init__(topImg, sideImg, topContourIndex, sideContourIndex)
+        self.width = refObj_width
 
 class Object3D(Object):
     """높이가 있는 3D 물체"""
     def __init__(self, topImg=None, sideImg=None, topContourIndex=None, sideContourIndex=None):
         super().__init__(topImg, sideImg, topContourIndex, sideContourIndex)
+        # 형식 (width, height, area)
+        self.top_dimensions = None
+        self.side_dimensions = None
+        self.volume = None
 
-class RefObject(Object2D):
-    """물체 중 길이를 가늠하기 위한 reference Object(ex> 100원 동전)"""
-    def __init__(self, topImg=None, sideImg=None, topContourIndex=None, sideContourIndex=None, refObj_width=WIDTH_REF_OBJECT):
-        super().__init__(topImg, sideImg, topContourIndex, sideContourIndex)
-        self.width = refObj_width
-    
+    def calc2dDimensions(self, image, contour):
+        """
+        물체를 한 이미지(top/side)에서 봤을 때 width, height, area를 리턴(단위:mm, mm^2)
+        image: self.topImg or self.sideImg
+        contour: Image.coutours[ContourIndex]
+        """
+        width, height = image.getWidthHeight(contour)
+        width = width / image.PX_PER_MM
+        height = height / image.PX_PER_MM
+
+        area = image.getAreaSize_px(contour)
+        area = area / (image.PX_PER_MM**2)
+
+        return width, height, area
+
+    def set2dDimensions(self):
+        self.top_dimensions = self.calc2dDimensions(self.topImg, self.topImg.contours[self.topContourIndex]) 
+        self.side_dimensions = self.calc2dDimensions(self.topImg, self.sideImg.contours[self.sideContourIndex])
+
 class Image:
     """카메라로 찍은 사진(음식, ref물체 포함)"""
     def __init__(self, img_path):
@@ -44,8 +58,8 @@ class Image:
         self.original_img = self.getImage() #아무작업 안 한 오리지널 사진
         self.contours = self.getValidContours() #물체로 인식된 윤곽선들 모음
         self.marked_img = self.getMarkedImage() #여러가지 표시가 되어있는 사진
-        self.refObj = RefObject()
-        self.foodObj = Object3D()
+        self.refObj = None # RefObject
+        self.foodObj = None # Object3D
         self.PX_PER_MM = None # 1픽셀 당 mm(길이)
         
     def getImage(self, path=None):
@@ -87,7 +101,7 @@ class Image:
         return valid_cnts
     
     def getMarkedImage(self, original_img=None, contours=None):
-        """"""
+        """original_img에서 물체들을 탐지하여 사각형 및 index를 표시한 이미지 리턴"""
         if original_img == None: original_img = self.original_img
         if contours == None: contours = self.contours
 
@@ -208,7 +222,14 @@ def rescaleFrame(frame, scale=0.75):
 
 if __name__ == "__main__":
     #test
-    testimg = Image("images/side3.png")
-    resized_testimg = rescaleFrame(testimg.marked_img, 0.5)
-    cv2.imshow("test", resized_testimg);cv2.waitKey(0)#testcode
+    idx = 3
+    if idx == 1: idx = ''
+    refObj = RefObject()
+    foodObj = Object3D()
+    topImage = Image("images/top{}.png".format(idx))
+    sideImage = Image("images/side{}.png".format(idx))
+    cv2.imshow('top', rescaleFrame(topImage.marked_img, 0.5))
+    cv2.imshow('side', rescaleFrame(sideImage.marked_img, 0.5))
+    cv2.waitKey(0)
     #tset
+    
