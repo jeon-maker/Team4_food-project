@@ -1,6 +1,5 @@
 #참고자료: https://github.com/Practical-CV/Measuring-Size-of-Objects-with-OpenCV
-from cv2 import MARKER_DIAMOND
-from scipy.spatial import distance
+from scipy.spatial import distance as dist
 from imutils import perspective
 from imutils import contours
 import numpy as np
@@ -11,15 +10,31 @@ import cv2
 WIDTH_REF_OBJECT = 24 #100원 동전의 지름(mm)
 
 class Object:
-    """음식을 포함한 물체"""
-    def __init__(self, topImg, sideImg):
+    """사진에 찍혀있는 실제물체 하나"""
+    def __init__(self, topImg=None, sideImg=None, topContourIndex=None, sideContourIndex=None):
         self.topImg = topImg
         self.sideImg = sideImg
+        self.top_cntIndex = topContourIndex
+        self.side_cntIndex = sideContourIndex
+        # FIXME: 밑의 세가지는 Object가 아닌 한 사진에서의 물체의 property임
+        # self.cntArea = None #물체의 윤곽선 내부 면적
+        # self.bbox_width = -1 #물체를 감싸는 상자(Bounding Box)의 가로길이 (단위:mm)
+        # self.bbox_height = -1 #물체를 감싸는 상자(Bounding Box)의 세로길이 (단위:mm)
 
-class RefObject(Object):
+class Object2D(Object):
+    """높이가 없는 2D 물체"""
+    def __init__(self, topImg=None, sideImg=None, topContourIndex=None, sideContourIndex=None):
+        super().__init__(topImg, sideImg, topContourIndex, sideContourIndex)
+
+class Object3D(Object):
+    """높이가 있는 3D 물체"""
+    def __init__(self, topImg=None, sideImg=None, topContourIndex=None, sideContourIndex=None):
+        super().__init__(topImg, sideImg, topContourIndex, sideContourIndex)
+
+class RefObject(Object2D):
     """물체 중 길이를 가늠하기 위한 reference Object(ex> 100원 동전)"""
-    def __init__(self, topImg, sideImg, refObj_width=WIDTH_REF_OBJECT):
-        super().__init__(topImg, sideImg)
+    def __init__(self, topImg=None, sideImg=None, topContourIndex=None, sideContourIndex=None, refObj_width=WIDTH_REF_OBJECT):
+        super().__init__(topImg, sideImg, topContourIndex, sideContourIndex)
         self.width = refObj_width
     
 class Image:
@@ -27,20 +42,22 @@ class Image:
     def __init__(self, img_path):
         self.img_path = img_path
         self.original_img = self.getImage() #아무작업 안 한 오리지널 사진
-        self.contours = self.getValidContours() #
+        self.contours = self.getValidContours() #물체로 인식된 윤곽선들 모음
         self.marked_img = self.getMarkedImage() #여러가지 표시가 되어있는 사진
+        self.refObj = RefObject()
+        self.foodObj = Object3D()
+        self.PX_PER_MM = None # 1픽셀 당 mm(길이)
         
     def getImage(self, path=None):
         """path에서 이미지 파일 리턴"""
-        if path is None:
-            path = self.img_path
+        if path is None: path = self.img_path
 
         image = cv2.imread(path)
         return image
 
     def getValidContours(self, image=None, ignoreLessThan_px=100):
         """
-        image에서 윤곽선 따서 쓸만한 윤곽선들만 리턴
+        image에서 윤곽선 따서 쓸만한 윤곽선들의 list 리턴
         ignoreLessThan_px 보다 적은 영역으로 된 윤곽은 버림
         """
         if image is None:
@@ -54,7 +71,7 @@ class Image:
         edged = cv2.Canny(gray, 50, 100)
         edged = cv2.dilate(edged, None, iterations=1)
         edged = cv2.erode(edged, None, iterations=1)
-        cv2.imshow("test", rescaleFrame(edged, 0.5));cv2.waitKey(0)#testcode
+        # cv2.imshow("test", rescaleFrame(edged, 0.5));cv2.waitKey(0)#testcode
 
         # edged 이미지에서 윤곽선따기, cnts 좌->우로 정렬
         cnts = cv2.findContours(edged.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -69,13 +86,92 @@ class Image:
 
         return valid_cnts
     
-    def getMarkedImage(self, image=None):
+    def getMarkedImage(self, original_img=None, contours=None):
         """"""
-        marked_img = self.original_img.copy()#testcode
-        cv2.drawContours(marked_img, self.contours, -1, (255,0,0), 3)#testcode
+        if original_img == None: original_img = self.original_img
+        if contours == None: contours = self.contours
+
+        marked_img = original_img.copy()
+
+        cntIndex = 0
+        for cnt in contours:
+            box = self.getBoundingBox(cnt)
+
+            # bbox 꼭짓점 찍고, 상자 그리기
+            for (x, y) in box: cv2.circle(marked_img, (int(x), int(y)), 5, (0, 0, 255), -1)
+            cv2.drawContours(marked_img, [box.astype("int")], -1, (0, 255, 0), 2)
+
+            # bbox 각 변의 중간점 좌표 구하기
+            (tl, tr, br, bl) = box
+            (tX, tY) = midpoint(tl, tr)
+            (bX, bY) = midpoint(bl, br)
+            (lX, lY) = midpoint(tl, bl)
+            (rX, rY) = midpoint(tr, br)
+
+            # bbox의 무게중심 좌표 구하기
+            (cX, cY) = midpoint((tX, tY), (bX, bY))
+
+            # bbox 각 변의 중간점 그리기
+            cv2.circle(marked_img, (int(tX), int(tY)), 5, (255, 0, 0), -1)
+            cv2.circle(marked_img, (int(bX), int(bY)), 5, (255, 0, 0), -1)
+            cv2.circle(marked_img, (int(lX), int(lY)), 5, (255, 0, 0), -1)
+            cv2.circle(marked_img, (int(rX), int(rY)), 5, (255, 0, 0), -1)
+
+            # bbox 중간점을 잇는 선 그리기
+            cv2.line(marked_img, (int(tX), int (tY)), (int(bX), int(bY)), (255, 0, 255), 2)
+            cv2.line(marked_img, (int(lX), int (lY)), (int(rX), int(rY)), (255, 0, 255), 2)
+
+            # 각 contour의 index 그리기
+            cv2.putText(marked_img, "[{}]".format(cntIndex), (int(cX)-35, int(cY)), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 0), 3)
+
+
+            cntIndex += 1
+        
 
         return marked_img
+    
+    def getBoundingBox(self, contour):
+        """
+        전달받은 contour을 감싸는 사각형(bbox)의 꼭짓점 좌표 리턴
+        형식: top-left, top-right, bottom-right, bottom-left
+        """
+        # Rotated bounding box 방식으로 bbox 처리
+        # TODO: cv2.boundingRect(contour)로 바꿔서 계산하는 것 고려
+        box = cv2.minAreaRect(contour)
+        box = cv2.boxPoints(box) # box = cv2.cv.BoxPoints(box) if imutils.is_cv2() else cv2.boxPoints(box) # 보통은 cv2아니라서 주석처리
+        box = np.array(box, dtype="int")
+
+        # 꼭짓점 좌표를 tl, tr, br, bl 순으로 조정
+        box = perspective.order_points(box)
+
+        return box
+
+    def getWidthHeight_px(self, contour):
+        """전달받은 contour의 bbox에서 width, height 계산 후 리턴"""
+        box = self.getBoundingBox(contour)
+
+        # bbox 각 변의 중간점 좌표 구하기
+        (tl, tr, br, bl) = box
+        (tX, tY) = midpoint(tl, tr)
+        (bX, bY) = midpoint(bl, br)
+        (lX, lY) = midpoint(tl, bl)
+        (rX, rY) = midpoint(tr, br)
+
+        # bbox의 가로 세로 길이 구하기(단위: px)
+        width_px = dist.euclidean((tX, tY), (bX, bY))
+        height_px = dist.euclidean((lX, lY), (rX, rY))
+
+        return width_px, height_px
+
+    def getAreaSize_px(self, contour):
+        """전달받은 contour의 내부 면적 리턴"""
+        return cv2.contourArea(contour)
         
+    def setPixelsPerMetric(self):
+        pass
+
+    def px2mm(self):pass
+    def px2sqmm(self):pass
         
 
 
@@ -112,7 +208,7 @@ def rescaleFrame(frame, scale=0.75):
 
 if __name__ == "__main__":
     #test
-    testimg = Image("images/top3.png")
+    testimg = Image("images/side3.png")
     resized_testimg = rescaleFrame(testimg.marked_img, 0.5)
     cv2.imshow("test", resized_testimg);cv2.waitKey(0)#testcode
     #tset
