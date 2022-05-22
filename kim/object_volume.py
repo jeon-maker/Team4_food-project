@@ -99,7 +99,6 @@ class Image:
             # cv2.drawContours(marked_img, cnt, -1, (255,0,0), 3)
 
             cntIndex += 1
-        
 
         return marked_img
     
@@ -244,13 +243,13 @@ def rescaleFrame(frame, scale=0.75):
 
 if __name__ == "__main__":
     #test
-    # idx = 1
-    # if idx == 1: idx = ''
-    # topImage = Image("images/top{}.png".format(idx))
-    # sideImage = Image("images/side{}.png".format(idx))
+    idx = 3
+    if idx == 1: idx = ''
+    topImage = Image("images/top{}.png".format(idx))
+    sideImage = Image("images/side{}.png".format(idx))
 
-    topImage = Image("images/top4.jpg")
-    sideImage = Image("images/side4l.jpg")
+    # topImage = Image("images/top5.jpg")
+    # sideImage = Image("images/side5.jpg")
 
     foodObj = Object3D(topImage, sideImage)
     cv2.imshow('top', rescaleFrame(topImage.marked_img, 0.5))
