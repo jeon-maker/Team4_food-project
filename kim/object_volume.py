@@ -6,6 +6,7 @@ import numpy as np
 import argparse
 import imutils
 import cv2
+import math
 
 # TODO: 코드 서순
     # 1. 탑뷰 이미지에서 발견한 물체들 나열
@@ -18,65 +19,17 @@ import cv2
     # 8. 물체를 둘러싸는 큐브 부피 구하기
     # 9. cArea를 이용해서 top_proportion과 side_proportion구한 뒤 prism부피 계산
     # 10. 두개의 prism부피 평균값 구한 뒤 리턴
-
-WIDTH_REF_OBJECT = 24 #100원 동전의 지름(mm)
-
-class Object:
-    """사진에 찍혀있는 실제물체 하나"""
-    def __init__(self, topImg=None, sideImg=None):
-        self.topImg = topImg
-        self.sideImg = sideImg
-        self.top_cntIndex = None
-        self.side_cntIndex = None
-    
-    def setContourIndex(self, top_idx, side_idx):
-        self.top_cntIndex = top_idx
-        self.side_cntIndex = side_idx
-
-
-class RefObject(Object):
-    """물체 중 길이를 가늠하기 위한 reference Object(ex> 100원 동전)"""
-    def __init__(self, topImg=None, sideImg=None, refObj_width=WIDTH_REF_OBJECT):
-        super().__init__(topImg, sideImg)
-        self.width = refObj_width
-
-class Object3D(Object):
-    """높이가 있는 3D 물체"""
-    def __init__(self, topImg=None, sideImg=None):
-        super().__init__(topImg, sideImg)
-        self.top_dimensions = None # 형식 (width, height, area)
-        self.side_dimensions = None # 형식 (width, height, area)
-        self.SINE_CAM_ANGLE = None
-        self.volume = None
-
-    def calc2dDimensions(self, image, contour):
-        """
-        물체를 한 이미지(top/side)에서 봤을 때 width, height, area를 리턴(단위:mm, mm^2)
-        image: self.topImg or self.sideImg
-        contour: Image.coutours[ContourIndex]
-        """
-        width, height = image.getWidthHeight(contour)
-        width = width / image.PX_PER_MM
-        height = height / image.PX_PER_MM
-
-        area = image.getAreaSize_px(contour)
-        area = area / (image.PX_PER_MM**2)
-
-        return width, height, area
-
-    def set2dDimensions(self):
-        self.top_dimensions = self.calc2dDimensions(self.topImg, self.topImg.contours[self.topContourIndex]) 
-        self.side_dimensions = self.calc2dDimensions(self.topImg, self.sideImg.contours[self.sideContourIndex])
-
+     
 class Image:
     """카메라로 찍은 사진(음식, ref물체 포함)"""
+    WIDTH_REF_OBJECT = 24 #100원 동전의 지름(mm)
+
     def __init__(self, img_path):
         self.img_path = img_path
         self.original_img = self.getImage() #아무작업 안 한 오리지널 사진
         self.contours = self.getValidContours() #물체로 인식된 윤곽선들 모음
         self.marked_img = self.getMarkedImage() #여러가지 표시가 되어있는 사진
-        self.refObj = None # reference object - RefObject() TODO: 이것을 그냥 Image 클래스에 종속시키는 방향 고려
-        self.tarObj = None # target object - Object3D()
+        self.contour_ref = None # contour of reference object
         self.PX_PER_MM = None # 1픽셀 당 mm(길이)
         
     def getImage(self, path=None):
@@ -102,7 +55,6 @@ class Image:
         edged = cv2.Canny(gray, 50, 100)
         edged = cv2.dilate(edged, None, iterations=1)
         edged = cv2.erode(edged, None, iterations=1)
-        # cv2.imshow("test", rescaleFrame(edged, 0.5));cv2.waitKey(0)#testcode
 
         # edged 이미지에서 윤곽선따기, cnts 좌->우로 정렬
         cnts = cv2.findContours(edged.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -197,17 +149,92 @@ class Image:
     def getAreaSize_px(self, contour):
         """전달받은 contour의 내부 면적 리턴"""
         return cv2.contourArea(contour)
-        
-    def setObjects(self, refObj: RefObject, tarObj: Object3D):
-        self.refObj = refObj
-        self.tarObj = tarObj
 
+    def setContour_ref(self, index):
+        """입력된 index에 해당하는 contour을 self.contour_ref로 지정"""
+        self.contour_ref = self.contours[index]
 
     def setPixelsPerMetric(self):
-        pass
+        self.PX_PER_MM = self.getWidthHeight_px(self.contour_ref)[0]  / self.WIDTH_REF_OBJECT
 
-    def px2mm(self):pass
-    def px2sqmm(self):pass
+class Object3D():
+    """
+    높이가 있는 3D 물체
+    metric unit은 mm, mm^2, mm^3으로 통일(pixel 아님)
+    """
+    def __init__(self, topImg: Image, sideImg: Image):
+        # 기초 맴버변수
+        self.topImg = topImg
+        self.sideImg = sideImg
+        self.top_cntIndex = None
+        self.side_cntIndex = None
+
+        # 2D관련 정보들
+        self.top_dimensions = None # 형식 (width, height, area)
+        self.side_dimensions = None # 형식 (width, height, area)
+        self.SINE_CAM_ANGLE = None
+        
+        # Bounding Cuboid의 dimensions
+        self.bCuboid_width = None
+        self.bCuboid_depth = None
+        self.bCuboid_height = 0
+        
+        self.volume = None
+
+    def setContourIndex(self, top_idx, side_idx):
+        self.top_cntIndex = top_idx
+        self.side_cntIndex = side_idx
+
+    def calc2dDimensions(self, image, contour):
+        """
+        물체를 한 이미지(top/side)에서 봤을 때 width, height, area를 리턴(단위:mm, mm^2)
+        image: self.topImg or self.sideImg
+        contour: Image.coutours[ContourIndex]
+        """
+        width, height = image.getWidthHeight_px(contour)
+        width = width / image.PX_PER_MM
+        height = height / image.PX_PER_MM
+
+        area = image.getAreaSize_px(contour)
+        area = area / (image.PX_PER_MM**2)
+
+        return width, height, area
+
+    def set2dDimensions(self):
+        self.top_dimensions = self.calc2dDimensions(self.topImg, self.topImg.contours[self.top_cntIndex]) 
+        self.side_dimensions = self.calc2dDimensions(self.sideImg, self.sideImg.contours[self.side_cntIndex])
+
+    def calcCamAngle(self):
+        """self.SINE_CAM_ANGLE 계산 후 설정"""
+        # self.SINE_CAM_ANGLE = self.side_dimensions[1] / self.top_dimensions[1] # sideH/topH
+        top_refH = self.topImg.getWidthHeight_px(self.topImg.contour_ref)[1] / self.topImg.PX_PER_MM
+        side_refH = self.sideImg.getWidthHeight_px(self.sideImg.contour_ref)[1] / self.sideImg.PX_PER_MM
+        print(side_refH, top_refH)#testcode
+        self.SINE_CAM_ANGLE = side_refH / top_refH
+    
+    def setBCuboidDimensions(self):
+        self.bCuboid_width = self.top_dimensions[0] # topW
+        self.bCuboid_depth = self.top_dimensions[1] # topH
+        self.bCuboid_height = self.side_dimensions[1] / math.sqrt(1-(self.SINE_CAM_ANGLE)**2) # sideH/sqrt(1-sin^2)
+
+    def calcVolume(self):
+        """prism 형태의 도형 두가지를 계산하고 평균값 도출"""
+        tArea = self.top_dimensions[2]
+        tHeight = self.bCuboid_height
+        sArea = self.side_dimensions[2]
+        sHeight = self.bCuboid_depth
+
+        top_prismV = tArea * tHeight
+        side_prismV = sArea * sHeight
+
+        self.volume = (top_prismV + side_prismV) / 2
+
+    def setAll(self):
+        """cnt_index만 설정되어있으면 나머지 맴버변수 모두 설정"""
+        self.set2dDimensions()
+        self.calcCamAngle()
+        self.setBCuboidDimensions()
+        self.calcVolume()
           
 def midpoint(point1, point2):
     return ((point1[0] + point2[0])/2, (point1[1] + point2[1])/2)
@@ -227,11 +254,10 @@ def rescaleFrame(frame, scale=0.75):
 
 if __name__ == "__main__":
     #test
-    idx = 3
+    idx = 1
     if idx == 1: idx = ''
     topImage = Image("images/top{}.png".format(idx))
     sideImage = Image("images/side{}.png".format(idx))
-    refObj = RefObject(topImage, sideImage)
     foodObj = Object3D(topImage, sideImage)
     cv2.imshow('top', rescaleFrame(topImage.marked_img, 0.5))
     cv2.imshow('side', rescaleFrame(sideImage.marked_img, 0.5))
@@ -239,20 +265,22 @@ if __name__ == "__main__":
     
     # 사용자가 refObject와 foodObject를 번호로 지정
     print("<Top Image>")
-    top_ref_index = input("Reference 물체의 번호:")
-    top_tar_index = input("부피 측정을 원하는 음식의 번호:")
+    top_ref_index = int(input("Reference 물체의 번호:"))
+    top_tar_index = int(input("부피 측정을 원하는 음식의 번호:"))
     print("<Side Image>")
-    side_ref_index = input("Reference 물체의 번호:")
-    side_tar_index = input("부피 측정을 원하는 음식의 번호:")
+    side_ref_index = int(input("Reference 물체의 번호:"))
+    side_tar_index = int(input("부피 측정을 원하는 음식의 번호:"))
 
     # Object들에 index 설정
-    refObj.setContourIndex(top_ref_index, side_ref_index)
+    topImage.setContour_ref(top_ref_index)
+    sideImage.setContour_ref(side_ref_index)
     foodObj.setContourIndex(top_tar_index, side_tar_index)
 
-    # Image들에 Object 설정
-    topImage.setObjects(refObj, foodObj)
-    sideImage.setObjects(refObj, foodObj)
+    # 각 이미지의 px_per_mm 설정
+    topImage.setPixelsPerMetric()
+    sideImage.setPixelsPerMetric()
 
-    
+    foodObj.setAll()
+    print(foodObj.volume + "mm^3")
     #tset
     
