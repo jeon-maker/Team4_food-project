@@ -95,6 +95,9 @@ class Image:
             # 각 contour의 index 그리기
             cv2.putText(marked_img, "[{}]".format(cntIndex), (int(cX)-35, int(cY)), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 0), 3)
 
+            # contour 그리기
+            # cv2.drawContours(marked_img, cnt, -1, (255,0,0), 3)
+
             cntIndex += 1
         
 
@@ -241,10 +244,14 @@ def rescaleFrame(frame, scale=0.75):
 
 if __name__ == "__main__":
     #test
-    idx = 1
-    if idx == 1: idx = ''
-    topImage = Image("images/top{}.png".format(idx))
-    sideImage = Image("images/side{}.png".format(idx))
+    # idx = 1
+    # if idx == 1: idx = ''
+    # topImage = Image("images/top{}.png".format(idx))
+    # sideImage = Image("images/side{}.png".format(idx))
+
+    topImage = Image("images/top4.jpg")
+    sideImage = Image("images/side4l.jpg")
+
     foodObj = Object3D(topImage, sideImage)
     cv2.imshow('top', rescaleFrame(topImage.marked_img, 0.5))
     cv2.imshow('side', rescaleFrame(sideImage.marked_img, 0.5))
