@@ -60,7 +60,6 @@ def object_size(img_path, ref_width):
 		box = cv2.minAreaRect(c)
 		box = cv2.cv.BoxPoints(box) if imutils.is_cv2() else cv2.boxPoints(box)
 		box = np.array(box, dtype="int")
-#--------------------------------------여기까지 함--------------------------------------#
 
 		# order the points in the contour such that they appear
 		# in top-left, top-right, bottom-right, and bottom-left
@@ -100,6 +99,7 @@ def object_size(img_path, ref_width):
 		# compute the Euclidean distance between the midpoints
 		dA = dist.euclidean((tltrX, tltrY), (blbrX, blbrY))
 		dB = dist.euclidean((tlblX, tlblY), (trbrX, trbrY))
+#--------------------------------------여기까지 함--------------------------------------#
 
 		# if the pixels per metric has not been initialized, then
 		# compute it as the ratio of pixels to supplied metric
@@ -149,6 +149,8 @@ if __name__ == "__main__":
 	x = dims1[1][1]
 	y = dims1[1][0]
 	z = dims2[1][1] / (1/(math.sqrt(1-camAngle_sin**2)))
+	print(dims2[1][1])#testcode
+	print(camAngle_sin)#testcode
 
 
 	top_proportion = dims1[1][2]/(dims1[1][0]*dims1[1][1])

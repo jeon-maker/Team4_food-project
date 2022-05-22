@@ -7,22 +7,9 @@ import argparse
 import imutils
 import cv2
 import math
-
-# TODO: 코드 서순
-    # 1. 탑뷰 이미지에서 발견한 물체들 나열
-    # 2. 사이드뷰 이미지에서 발견한 물체들 나열
-    # 3. 1,2 에서 발견한 물체들 중 각각 referance object(refO)과 target object(tarO) 하나씩 선택
-    # 4. refO과 tarO의 top, side에서의 width, height 리스트에 저장
-    # 5. tarO의 top, side에서의 contour area(cArea)를 리스트에 저장
-    # 6. 4에서 구한 refO의 width들로 각도(camAngle_sin)를 계산
-    # 7. tarO_top의 height와 camAngle_sin으로 3차원 높이(3dHeight) 계산
-    # 8. 물체를 둘러싸는 큐브 부피 구하기
-    # 9. cArea를 이용해서 top_proportion과 side_proportion구한 뒤 prism부피 계산
-    # 10. 두개의 prism부피 평균값 구한 뒤 리턴
      
 class Image:
     """카메라로 찍은 사진(음식, ref물체 포함)"""
-    WIDTH_REF_OBJECT = 24 #100원 동전의 지름(mm)
 
     def __init__(self, img_path):
         self.img_path = img_path
@@ -31,6 +18,7 @@ class Image:
         self.marked_img = self.getMarkedImage() #여러가지 표시가 되어있는 사진
         self.contour_ref = None # contour of reference object
         self.PX_PER_MM = None # 1픽셀 당 mm(길이)
+        self.WIDTH_REF_OBJECT = 24 #100원 동전의 지름(mm)
         
     def getImage(self, path=None):
         """path에서 이미지 파일 리턴"""
@@ -107,7 +95,6 @@ class Image:
             # 각 contour의 index 그리기
             cv2.putText(marked_img, "[{}]".format(cntIndex), (int(cX)-35, int(cY)), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 0), 3)
 
-
             cntIndex += 1
         
 
@@ -135,14 +122,14 @@ class Image:
 
         # bbox 각 변의 중간점 좌표 구하기
         (tl, tr, br, bl) = box
-        (tX, tY) = midpoint(tl, tr)
-        (bX, bY) = midpoint(bl, br)
-        (lX, lY) = midpoint(tl, bl)
-        (rX, rY) = midpoint(tr, br)
+        (tltrX, tltrY) = midpoint(tl, tr)
+        (blbrX, blbrY) = midpoint(bl, br)
+        (tlblX, tlblY) = midpoint(tl, bl)
+        (trbrX, trbrY) = midpoint(tr, br)
 
         # bbox의 가로 세로 길이 구하기(단위: px)
-        width_px = dist.euclidean((tX, tY), (bX, bY))
-        height_px = dist.euclidean((lX, lY), (rX, rY))
+        width_px = dist.euclidean((tlblX, tlblY), (trbrX, trbrY))
+        height_px = dist.euclidean((tltrX, tltrY), (blbrX, blbrY))
 
         return width_px, height_px
 
@@ -185,7 +172,7 @@ class Object3D():
         self.top_cntIndex = top_idx
         self.side_cntIndex = side_idx
 
-    def calc2dDimensions(self, image, contour):
+    def calc2dDimensions(self, image: Image, contour):
         """
         물체를 한 이미지(top/side)에서 봤을 때 width, height, area를 리턴(단위:mm, mm^2)
         image: self.topImg or self.sideImg
@@ -206,16 +193,16 @@ class Object3D():
 
     def calcCamAngle(self):
         """self.SINE_CAM_ANGLE 계산 후 설정"""
-        # self.SINE_CAM_ANGLE = self.side_dimensions[1] / self.top_dimensions[1] # sideH/topH
+        # TODO: 각도 구하는 것 재검토 요망
         top_refH = self.topImg.getWidthHeight_px(self.topImg.contour_ref)[1] / self.topImg.PX_PER_MM
         side_refH = self.sideImg.getWidthHeight_px(self.sideImg.contour_ref)[1] / self.sideImg.PX_PER_MM
-        print(side_refH, top_refH)#testcode
         self.SINE_CAM_ANGLE = side_refH / top_refH
     
     def setBCuboidDimensions(self):
+        # TODO: 높이 구하는 것 재검토 요망(기존 object_size.py들과 다른 결과)
         self.bCuboid_width = self.top_dimensions[0] # topW
         self.bCuboid_depth = self.top_dimensions[1] # topH
-        self.bCuboid_height = self.side_dimensions[1] / math.sqrt(1-(self.SINE_CAM_ANGLE)**2) # sideH/sqrt(1-sin^2)
+        self.bCuboid_height = self.side_dimensions[1] / math.sqrt(1-self.SINE_CAM_ANGLE**2) # sideH/sqrt(1-sin^2)
 
     def calcVolume(self):
         """prism 형태의 도형 두가지를 계산하고 평균값 도출"""
@@ -281,6 +268,7 @@ if __name__ == "__main__":
     sideImage.setPixelsPerMetric()
 
     foodObj.setAll()
-    print(foodObj.volume + "mm^3")
+    # print("x,y,z = {}, {}, {}".format(foodObj.bCuboid_width, foodObj.bCuboid_depth, foodObj.bCuboid_height))#testcode
+    print(foodObj.volume, "mm^3")
     #tset
     
