@@ -276,37 +276,13 @@ if __name__ == "__main__":
     #test
     idx = 3
     if idx == 1: idx = ''
-    # topImage = Image("images/top{}.png".format(idx))
-    # sideImage = Image("images/side{}.png".format(idx))
-
+    topImagePath = "images/top{}.png".format(idx)
+    sideImagePath = "images/side{}.png".format(idx)
     # # topImage = Image("images/top5.jpg")
     # # sideImage = Image("images/side5.jpg")
 
-    # foodObj = Object3D(topImage, sideImage)
-    # cv2.imshow('top', rescaleFrame(topImage.marked_img, 0.5))
-    # cv2.imshow('side', rescaleFrame(sideImage.marked_img, 0.5))
-    # cv2.waitKey(1)
-    
-    # # 사용자가 refObject와 foodObject를 번호로 지정
-    # print("<Top Image>")
-    # top_ref_index = int(input("Reference 물체의 번호:"))
-    # top_tar_index = int(input("부피 측정을 원하는 음식의 번호:"))
-    # print("<Side Image>")
-    # side_ref_index = int(input("Reference 물체의 번호:"))
-    # side_tar_index = int(input("부피 측정을 원하는 음식의 번호:"))
-
-    # # Object들에 index 설정
-    # topImage.setContour_ref(top_ref_index)
-    # sideImage.setContour_ref(side_ref_index)
-    # foodObj.setContourIndex(top_tar_index, side_tar_index)
-
-    # # 각 이미지의 px_per_mm 설정
-    # topImage.setPixelsPerMetric()
-    # sideImage.setPixelsPerMetric()
-
-    # foodObj.setAll()
     # print("x,y,z = {}, {}, {}".format(foodObj.bCuboid_width, foodObj.bCuboid_depth, foodObj.bCuboid_height))#testcode
 
-    print(calcVolume("images/top{}.png".format(idx), "images/side{}.png".format(idx)), "mm^3")
+    print(calcVolume(topImagePath, sideImagePath), "mm^3")
     #tset
     
