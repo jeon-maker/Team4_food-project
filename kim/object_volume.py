@@ -241,48 +241,65 @@ def rescaleFrame(frame, scale=0.75):
 
     return cv2.resize(frame, dimensions, interpolation=cv2.INTER_AREA)
 
-def calcVolume(top_image_path, side_image_path):
+def calcVolume(top_image_path, side_image_path, objectNum = 1):
+    """부피를 측정하려는 물체의 개수: objectNum"""
     topImage = Image(top_image_path)
     sideImage = Image(side_image_path)
+    top_tar_index = list()
+    side_tar_index = list()
 
-    foodObj = Object3D(topImage, sideImage)
+    foodObjs = list()
+    for i in range(objectNum):
+        foodObjs.append(Object3D(topImage, sideImage))
     cv2.imshow('top', rescaleFrame(topImage.marked_img, 0.5))
     cv2.imshow('side', rescaleFrame(sideImage.marked_img, 0.5))
     cv2.waitKey(1)
     
     # 사용자가 refObject와 foodObject를 번호로 지정
     print("<Top Image>")
-    top_ref_index = int(input("Reference 물체의 번호:"))
-    top_tar_index = int(input("부피 측정을 원하는 음식의 번호:"))
+    top_ref_index = int(input("Reference 물체의 번호: "))
+    for i in range(objectNum):
+        top_tar_index.append(int(input("부피 측정을 원하는 음식#{}의 번호: ".format(i))))
+
     print("<Side Image>")
     side_ref_index = int(input("Reference 물체의 번호:"))
-    side_tar_index = int(input("부피 측정을 원하는 음식의 번호:"))
+    for i in range(objectNum):
+        side_tar_index.append(int(input("부피 측정을 원하는 음식#{}의 번호: ".format(i))))
 
     # Object들에 index 설정
     topImage.setContour_ref(top_ref_index)
     sideImage.setContour_ref(side_ref_index)
-    foodObj.setContourIndex(top_tar_index, side_tar_index)
+    for i in range(objectNum):
+        foodObjs[i].setContourIndex(top_tar_index[i], side_tar_index[i])
 
     # 각 이미지의 px_per_mm 설정
     topImage.setPixelsPerMetric()
     sideImage.setPixelsPerMetric()
 
-    foodObj.setAll()
+    for i in range(objectNum):
+        foodObjs[i].setAll()
 
-    return foodObj.volume
+    foodVolumes = list()
+    for foodObj in foodObjs:
+        foodVolumes.append(foodObj.volume)
+
+    return foodVolumes
 
 
 if __name__ == "__main__":
     #test
-    idx = 3
-    if idx == 1: idx = ''
-    topImagePath = "images/top{}.png".format(idx)
-    sideImagePath = "images/side{}.png".format(idx)
-    # # topImage = Image("images/top5.jpg")
-    # # sideImage = Image("images/side5.jpg")
+    # idx = 3
+    # if idx == 1: idx = ''
+    # topImagePath = "images/top{}.png".format(idx)
+    # sideImagePath = "images/side{}.png".format(idx)
+    topImagePath = "images/top6.jpg"
+    sideImagePath = "images/side6.jpg"
 
     # print("x,y,z = {}, {}, {}".format(foodObj.bCuboid_width, foodObj.bCuboid_depth, foodObj.bCuboid_height))#testcode
 
-    print(calcVolume(topImagePath, sideImagePath), "mm^3")
+    i = 2
+    volumes = calcVolume(topImagePath, sideImagePath, i)
+    for vol in volumes:
+        print(vol, "mm^3")
     #tset
     
