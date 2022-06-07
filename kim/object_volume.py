@@ -252,6 +252,7 @@ def calcVolume(top_image_path, side_image_path, objectNum = 1):
     for i in range(objectNum):
         foodObjs.append(Object3D(topImage, sideImage))
     cv2.imshow('top', rescaleFrame(topImage.marked_img, 0.5))
+    cv2.waitKey(1)
     cv2.imshow('side', rescaleFrame(sideImage.marked_img, 0.5))
     cv2.waitKey(1)
     
@@ -288,16 +289,16 @@ def calcVolume(top_image_path, side_image_path, objectNum = 1):
 
 if __name__ == "__main__":
     #test
-    # idx = 3
-    # if idx == 1: idx = ''
-    # topImagePath = "images/top{}.png".format(idx)
-    # sideImagePath = "images/side{}.png".format(idx)
-    topImagePath = "images/top6.jpg"
-    sideImagePath = "images/side6.jpg"
+    idx = 3
+    if idx == 1: idx = ''
+    topImagePath = "images/top{}.png".format(idx)
+    sideImagePath = "images/side{}.png".format(idx)
+    # topImagePath = "images/top6.jpg"
+    # sideImagePath = "images/side6.jpg"
 
     # print("x,y,z = {}, {}, {}".format(foodObj.bCuboid_width, foodObj.bCuboid_depth, foodObj.bCuboid_height))#testcode
 
-    i = 2
+    i = 1
     volumes = calcVolume(topImagePath, sideImagePath, i)
     for vol in volumes:
         print(vol, "mm^3")
