@@ -14,7 +14,7 @@ class Image:
     def __init__(self, img_path):
         self.img_path = img_path
         self.original_img = self.getImage() #아무작업 안 한 오리지널 사진
-        self.contours = self.getValidContours() #물체로 인식된 윤곽선들 모음
+        self.contours = self.getValidContours(ignoreLessThan_px=500) #물체로 인식된 윤곽선들 모음
         self.marked_img = self.getMarkedImage() #여러가지 표시가 되어있는 사진
         self.contour_ref = None # contour of reference object
         self.PX_PER_MM = None # 1픽셀 당 mm(길이)
@@ -289,18 +289,24 @@ def calcVolume(top_image_path, side_image_path, objectNum = 1):
 
 if __name__ == "__main__":
     #test
-    idx = 3
-    if idx == 1: idx = ''
-    topImagePath = "images/top{}.png".format(idx)
-    sideImagePath = "images/side{}.png".format(idx)
+    # idx = 3
+    # if idx == 1: idx = ''
+    # topImagePath = "images/top{}.png".format(idx)
+    # sideImagePath = "images/side{}.png".format(idx)
+    ###
     # topImagePath = "images/top6.jpg"
     # sideImagePath = "images/side6.jpg"
 
     # print("x,y,z = {}, {}, {}".format(foodObj.bCuboid_width, foodObj.bCuboid_depth, foodObj.bCuboid_height))#testcode
 
+    idx = 1
+    topImagePath = "images/rice/{}/top{}.jpg".format(idx, idx)
+    sideImagePath = "images/rice/{}/side{}.jpg".format(idx, idx)
+
     i = 1
+    rice_calperg = 305/300
     volumes = calcVolume(topImagePath, sideImagePath, i)
     for vol in volumes:
-        print(vol, "mm^3")
+        print(vol, "mm^3", (vol/1000)*rice_calperg, "kcal")
     #tset
     
